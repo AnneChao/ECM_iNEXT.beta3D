@@ -246,7 +246,7 @@ simu_output = parLapply(cl, 1:200, function(k) {
       
     }) %>% do.call(rbind,.),
     
-    Latitude = names(beta.temp)[i])
+    Latitude = names(beta.spat)[i])
   }) %>% do.call(rbind,.)
   
   output.spat$Dataset = as.numeric(output.spat$Dataset)

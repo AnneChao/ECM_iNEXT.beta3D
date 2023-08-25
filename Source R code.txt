@@ -691,8 +691,8 @@ fig_6a = function(output) {
       theme(legend.position = 'bottom', legend.direction = "vertical",
             legend.text = element_text(size = 13),
             legend.title = element_blank(),
-            axis.text.y = element_text(size = 14),
-            axis.text.x = element_text(size = 14, angle = 45, vjust = 1, hjust = 1),
+            axis.text.y = element_text(size = 11),
+            axis.text.x = element_text(size = 11, angle = 45, vjust = 1, hjust = 1),
             axis.title = element_text(hjust = 0.5, size = 15, face = 'bold'),
             plot.title = element_text(hjust = 0.5, size = 17),
             strip.text = element_text(size = 15, face = 'bold')) 
@@ -780,12 +780,11 @@ fig_6b = function(output) {
       scale_linetype_manual(values = c("1" = "solid", "0" = "dashed"),
                             labels = c("Significant slope (P < 0.05)", "Nonsignificant slope"),
                             limits = c("1", "0"), name = NULL) + 
-      scale_size_manual(values = c(0.9, 1), guide = FALSE) +
+      scale_size_manual(values = c(1, 1.1), guide = FALSE) +
       theme(legend.position = 'bottom', legend.direction = 'vertical',
-            legend.text = element_text(size = 15),
-            legend.title = element_text(size = 15),
+            legend.text = element_text(size = 13),
             axis.text.x = element_blank(),
-            axis.text.y = element_text(size = 15),
+            axis.text.y = element_text(size = 11),
             axis.ticks.x = element_blank(),
             axis.title.x = element_blank(),
             axis.title.y = element_blank(),
@@ -808,12 +807,11 @@ fig_6b = function(output) {
       scale_linetype_manual(values = c("1" = "solid", "0" = "dashed"),
                             labels = c("Significant slope (P < 0.05)", "Nonsignificant slope"),
                             limits = c("1", "0"), name = NULL) + 
-      scale_size_manual(values = c(0.9, 1), guide = FALSE) +
+      scale_size_manual(values = c(1, 1.1), guide = FALSE) +
       theme(legend.position = 'bottom', legend.direction = 'vertical',
-            legend.text = element_text(size = 15),
-            legend.title = element_text(size = 15),
+            legend.text = element_text(size = 13),
             axis.text.x = element_blank(),
-            axis.text.y = element_text(size = 15),
+            axis.text.y = element_text(size = 11),
             axis.ticks.x = element_blank(),
             axis.title.x = element_blank(),
             axis.title.y = element_blank(),
@@ -836,12 +834,11 @@ fig_6b = function(output) {
       scale_linetype_manual(values = c("1" = "solid", "0" = "dashed"),
                             labels = c("Significant slope (P < 0.05)", "Nonsignificant slope"),
                             limits = c("1", "0"), name = NULL) + 
-      scale_size_manual(values = c(0.9, 1), guide = FALSE) +
+      scale_size_manual(values = c(1, 1.1), guide = FALSE) +
       theme(legend.position = 'bottom', legend.direction = 'vertical',
-            legend.text = element_text(size = 15),
-            legend.title = element_text(size = 15),
-            axis.text.y = element_text(size = 15),
-            axis.text.x = element_text(size = 15, angle = 45, vjust = 1, hjust = 1),
+            legend.text = element_text(size = 13),
+            axis.text.y = element_text(size = 11),
+            axis.text.x = element_text(size = 11, angle = 45, vjust = 1, hjust = 1),
             axis.title.x = element_blank(),
             axis.title.y = element_blank(),
             strip.text.x = element_text(size = 15, face = 'bold'),
@@ -864,12 +861,11 @@ fig_6b = function(output) {
                             labels = c("Significant slope (P < 0.05)", "Nonsignificant slope"),
                             limits = c("1", "0"), name = NULL) + 
       labs(x = "Year") +
-      scale_size_manual(values = c(0.9, 1), guide = FALSE) +
+      scale_size_manual(values = c(1, 1.1), guide = FALSE) +
       theme(legend.position = 'bottom', legend.direction = 'vertical',
-            legend.text = element_text(size = 15),
-            legend.title = element_text(size = 15),
-            axis.text.y = element_text(size = 15),
-            axis.text.x = element_text(size = 15, angle = 45, vjust = 1, hjust = 1),
+            legend.text = element_text(size = 13),
+            axis.text.y = element_text(size = 11),
+            axis.text.x = element_text(size = 11, angle = 45, vjust = 1, hjust = 1),
             axis.title.x = element_text(size = 15, hjust = 0.25, face = 'bold'),
             axis.title.y = element_blank(),
             strip.text.x = element_text(size = 15, face = 'bold'),
