@@ -192,11 +192,11 @@ simu_output = parLapply(cl, 1:200, function(k) {
       tmp = lapply(1:3, function(i) cbind(y[[i]], div_type = names(y)[i])) %>% 
         do.call(rbind,.) %>% filter(SC %in% cov | Method == 'Observed')
       
-      obs = cbind(y$alpha, div_type = "beta") %>% filter(Method == 'Observed') %>%
+      obs.beta = cbind(y$alpha, div_type = "beta") %>% filter(Method == 'Observed') %>%
         mutate(Estimate = (y$gamma %>% filter(Method == 'Observed'))$Estimate / (y$alpha %>% filter(Method == 'Observed'))$Estimate, 
                SC = "NA")
       
-      rbind(tmp, obs)
+      rbind(tmp, obs.beta)
       
     }) %>% do.call(rbind,.),
     
@@ -204,7 +204,10 @@ simu_output = parLapply(cl, 1:200, function(k) {
   }) %>% do.call(rbind,.)
   
   output.temp$Dataset = as.numeric(output.temp$Dataset)
+  obs_SC1 = output.temp %>% filter(Method == "Observed", SC == 1)
   output.temp[output.temp$Method == 'Observed', 'SC'] = 'Observed'
+  
+  if (nrow(obs_SC1) >= 1) output.temp = rbind(output.temp, obs_SC1)
   
   ## ================== Spatial ================== ##
   beta.spat = lapply( list( c('South', 'North') ), function(i) {
@@ -238,11 +241,11 @@ simu_output = parLapply(cl, 1:200, function(k) {
       tmp = lapply(1:3, function(i) cbind(y[[i]], div_type = names(y)[i])) %>% 
         do.call(rbind,.) %>% filter(SC %in% cov | Method == 'Observed')
       
-      obs = cbind(y$alpha, div_type = "beta") %>% filter(Method == 'Observed') %>%
+      obs.beta = cbind(y$alpha, div_type = "beta") %>% filter(Method == 'Observed') %>%
         mutate(Estimate = (y$gamma %>% filter(Method == 'Observed'))$Estimate / (y$alpha %>% filter(Method == 'Observed'))$Estimate, 
                SC = "NA")
       
-      rbind(tmp, obs)
+      rbind(tmp, obs.beta)
       
     }) %>% do.call(rbind,.),
     
