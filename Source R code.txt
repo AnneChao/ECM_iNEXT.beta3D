@@ -627,7 +627,7 @@ fig_5 = function(output) {
     geom_point(aes(x = Dataset + Age - 1997, y = Diversity, colour = Site, shape = Site), size = 1.5) +
     facet_grid(SC ~ Order.q, labeller = labeller(SC = c(`Observed` = "Observed data", `0.8` = "Coverage = 80%", `0.9` = "Coverage = 90%", 
                                                             `0.95` = "Coverage = 95%", `1` = "Asymptotic"))) +
-    labs(x = "Forest age (yr)", y = 'Beta diversity') +
+    labs(x = "Forest age (years)", y = 'Beta diversity') +
     theme_bw() +
     scale_colour_manual(values = c("red", "darkorange", "steelblue1", "blue", "springgreen", "green4")) +
     scale_fill_manual(values = c("red", "darkorange", "steelblue1", "blue", "springgreen", "green4")) +
@@ -771,7 +771,7 @@ fig_6a = function(output) {
                             labels = c("Significant slope (P < 0.05)", "Nonsignificant slope"),
                             limits = c("1", "0")) + 
       scale_size_manual(values = c(1, 1.1), guide = FALSE) +
-      labs(x = 'Year', y = 'Beta Diversity') +
+      labs(x = 'Year', y = 'Beta diversity') +
       theme(legend.position = 'bottom', legend.direction = "vertical",
             legend.text = element_text(size = 13),
             legend.title = element_blank(),
