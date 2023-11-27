@@ -71,7 +71,8 @@ fig_2b_or_4b(output_fig_2b)
 # Figure 3. Beta diversity between Edge and Interior habitats as a function of fragment size under six coverage values.
 output_fig_3 = list("iNEXTbeta" = iNEXTbeta3D(data_for_beta, "TD", q = c(0,1,2), nboot = 0, 
                                               level = c(0.6, 0.7, 0.8, 0.9, 0.95, 1)),
-                    "obsbeta" = obsbeta(data_for_beta, q = c(0,1,2), nboot = 0))
+                    "obsbeta" = lapply(1:length(data_for_beta), function(i) 
+                      iNEXTbeta3D(data_for_beta[i], q = c(0, 1, 2), base = "size", level = sum(data_for_beta[[i]]), nboot = 0)[[1]]))
 
 fig_3(output_fig_3)
 
@@ -118,7 +119,7 @@ age = data.frame(Assem = c("Cuatro Rios", "Lindero el Peje", "Tirimbina", "Linde
 
 cpu.cores <- detectCores() - 1
 cl <- makeCluster(cpu.cores)
-clusterExport(cl, varlist = c("inci.raw", "for_fig_5", "obsbeta"), envir = environment())
+clusterExport(cl, varlist = c("inci.raw", "for_fig_5"), envir = environment())
 clusterEvalQ(cl, c(library(tidyverse), library(iNEXT.beta3D), library(iNEXT.3D), library(reshape2), 
                    library(magrittr), library(abind), library(future.apply)))
 
@@ -142,7 +143,7 @@ colnames(groupyear) = paste(groupyear[1,], groupyear[2,], sep = '~')
 
 cpu.cores <- detectCores()-1
 cl <- makeCluster(cpu.cores)
-clusterExport(cl, varlist = c("rarefysamples", "fish", "groupyear", "obsbeta"), envir = environment())
+clusterExport(cl, varlist = c("rarefysamples", "fish", "groupyear"), envir = environment())
 clusterEvalQ(cl, c(library(tidyverse), library(iNEXT.beta3D), library(iNEXT.3D), library(reshape2)))
 
 simu_output = parLapply(cl, 1:200, function(k) {
@@ -187,7 +188,8 @@ simu_output = parLapply(cl, 1:200, function(k) {
   
   output.temp = lapply(1:length(beta.temp),  function(i) {
     
-    result.obsbeta = obsbeta(beta.temp[[i]], q = c(0, 1, 2), datatype = 'abundance', nboot = 0)
+    result.obsbeta = lapply(1:length(beta.temp[[i]]), function(j) 
+      iNEXTbeta3D(beta.temp[[i]][j], q = c(0, 1, 2), base = "size", level = sum(beta.temp[[i]][[j]]), nboot = 0)[[1]])
     
     result.iNEXTbeta = iNEXTbeta3D(beta.temp[[i]], q = c(0, 1, 2), datatype = 'abundance', level = cov, nboot = 0)
     
@@ -197,8 +199,12 @@ simu_output = parLapply(cl, 1:200, function(k) {
                    select(c("Dataset", "Order.q", "SC", "Type", "Estimate"))) %>%
             do.call(rbind,.),
           
-          result.obsbeta %>% do.call(rbind,.) %>% rename("Estimate" = "Diversity") %>% mutate(SC = 'Observed') %>% 
-            select(c("Dataset", "Order.q", "SC", "Type", "Estimate"))) %>%
+          lapply(result.obsbeta, function(x) rbind(x$gamma %>% mutate(Gamma = x$gamma$Gamma / x$alpha$Alpha, Type = "beta", SC = 'Observed') %>% 
+                                                     rename("Estimate" = "Gamma"),
+                                                   x$gamma %>% rename("Estimate" = "Gamma") %>% mutate(Type = "gamma", SC = 'Observed'),
+                                                   x$alpha %>% rename("Estimate" = "Alpha") %>% mutate(Type = "alpha", SC = 'Observed')
+          )) %>% 
+            do.call(rbind,.) %>% select(Dataset, Order.q, SC, Type, Estimate)) %>%
       
       mutate(Latitude = names(beta.temp)[i], .after = "Type")
     
@@ -231,7 +237,8 @@ simu_output = parLapply(cl, 1:200, function(k) {
   
   output.spat = lapply(1:length(beta.spat),  function(i) {
     
-    result.obsbeta = obsbeta(beta.spat[[i]], q = c(0, 1, 2), datatype = 'abundance', nboot = 0)
+    result.obsbeta = lapply(1:length(beta.spat[[i]]), function(j) 
+      iNEXTbeta3D(beta.spat[[i]][j], q = c(0, 1, 2), base = "size", level = sum(beta.spat[[i]][[j]]), nboot = 0)[[1]])
     
     result.iNEXTbeta = iNEXTbeta3D(beta.spat[[i]], q = c(0, 1, 2), datatype = 'abundance', level = cov, nboot = 0)
     
@@ -241,8 +248,12 @@ simu_output = parLapply(cl, 1:200, function(k) {
                    select(c("Dataset", "Order.q", "SC", "Type", "Estimate"))) %>%
             do.call(rbind,.),
           
-          result.obsbeta %>% do.call(rbind,.) %>% rename("Estimate" = "Diversity") %>% mutate(SC = 'Observed') %>% 
-            select(c("Dataset", "Order.q", "SC", "Type", "Estimate"))) %>%
+          lapply(result.obsbeta, function(x) rbind(x$gamma %>% mutate(Gamma = x$gamma$Gamma / x$alpha$Alpha, Type = "beta", SC = 'Observed') %>% 
+                                                     rename("Estimate" = "Gamma"),
+                                                   x$gamma %>% rename("Estimate" = "Gamma") %>% mutate(Type = "gamma", SC = 'Observed'),
+                                                   x$alpha %>% rename("Estimate" = "Alpha") %>% mutate(Type = "alpha", SC = 'Observed')
+          )) %>% 
+            do.call(rbind,.) %>% select(Dataset, Order.q, SC, Type, Estimate)) %>%
       
       mutate(Latitude = names(beta.spat)[i], .after = "Type")
     
@@ -251,7 +262,7 @@ simu_output = parLapply(cl, 1:200, function(k) {
   output.spat$Dataset = as.numeric(output.spat$Dataset)
   
   list("temporal" = output.temp, "spatial" = output.spat)
-})
+  })
 
 stopCluster(cl)
 

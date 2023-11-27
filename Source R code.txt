@@ -247,12 +247,12 @@ fig_2b_or_4b = function(output){
 #' 
 fig_3 = function(output) {
   
-  output = lapply(1:length(output$iNEXTbeta), function(i) 
-    
-    rbind(output$iNEXTbeta[[i]]$beta %>% select(c("Dataset", "Order.q", "SC", "Beta")) %>% rename(Diversity = Beta),
-          output$obsbeta[[i]] %>% filter(Type == "beta") %>% mutate(SC = "Observed") %>% select(c("Dataset", "Order.q", "SC", "Diversity")))
-    
-    ) %>% do.call(rbind,.) 
+  output = rbind(lapply(output$iNEXTbeta, function(x) x$beta %>% select(c("Dataset", "Order.q", "SC", "Beta"))) %>%
+                   do.call(rbind,.),
+                 
+                 lapply(output$obsbeta, function(x) x$gamma %>% mutate(Beta = x$gamma$Gamma / x$alpha$Alpha, SC = "Observed")) %>% 
+                   do.call(rbind,.) %>% select(Dataset, Order.q, SC, Beta)
+                 )
   
   output = output %>%
     mutate('Fragment' = sapply(1:nrow(output), function(i) raw_data$Fragment.size[raw_data$Site[1:12] == output$Dataset[i]][1]),
@@ -268,7 +268,7 @@ fig_3 = function(output) {
     for(j in 1:length(unique(output$SC))) {
       
       myout_ <- output %>% filter(Order.q == unique(output$Order.q)[i], SC == unique(output$SC)[j])
-      anovs[i, j] <- ( lm(formula = Diversity ~ Fragment.log, data = myout_) %>% summary )$coefficients[2, 'Pr(>|t|)']
+      anovs[i, j] <- ( lm(formula = Beta ~ Fragment.log, data = myout_) %>% summary )$coefficients[2, 'Pr(>|t|)']
       
     }
     
@@ -282,7 +282,7 @@ fig_3 = function(output) {
   
   output = output %>% arrange(Order.q, SC)
   output = output %>% group_by(Order.q, SC) %>% 
-    do(lm(formula = Diversity ~ Fragment.log, data = . ) %>% predict %>% tibble(fit = .)) %>% 
+    do(lm(formula = Beta ~ Fragment.log, data = . ) %>% predict %>% tibble(fit = .)) %>% 
     ungroup %>% select(fit) %>% bind_cols(output)
   
   output = output %>% left_join(., 
@@ -296,7 +296,7 @@ fig_3 = function(output) {
   output$SC = factor(output$SC, level = levels(output$SC)[c(length(levels(output$SC)), 2:(length(levels(output$SC))-1), 1)])
   output$Order.q = as.factor(output$Order.q)
   
-  ggplot(output) + geom_point(aes(x = Fragment.log, y = Diversity), size = 2) +
+  ggplot(output) + geom_point(aes(x = Fragment.log, y = Beta), size = 2) +
     geom_line(aes(x = Fragment.log, y = fit, lty = Sig), col = 'red', size = 1.1) +
     labs(x = 'Fragment size (ha)', y = 'Beta diversity') +
     facet_grid(SC ~ Order.q, scale = 'free_y', 
@@ -319,237 +319,6 @@ fig_3 = function(output) {
           strip.text = element_text(size = 13, face = "bold"))
 }
 
-
-#' @Function obsbeta is used to get observed alpha, beta, and gamma diversity.
-#' @param data is the abundance or incidence raw data.
-#' @param q is a numerical vector specifying the diversity orders.
-#' @param datatype data type of input data: individual-based abundance data (datatype = "abundance") or species by sampling-units incidence matrix (datatype = "incidence_raw") with all entries being 0 (non-detection) or 1 (detection).
-#' @param nboot is a positive integer specifying the number of bootstrap replications when assessing sampling uncertainty and constructing confidence intervals.
-#' @param conf is a positive number < 1 specifying the level of confidence interval. 
-#' 
-obsbeta = function(data, q = seq(0, 2, 0.25), datatype = 'abundance', nboot = 20, conf = 0.95) {
-  
-  if (datatype == 'abundance') {
-    Ns = sapply(data, ncol)
-  }
-  
-  if (datatype == 'incidence_raw') {
-    Ns = sapply(data, length)
-  }
-  
-  region_names = names(data)
-  
-  tmp = qnorm(1 - (1 - conf)/2)
-  
-  
-  bootstrap = function(data, data_gamma, datatype){
-    
-    if (datatype == 'abundance'){
-      
-      S_obs = sum(data_gamma > 0)
-      n = sum(data_gamma)
-      f1 = sum(data_gamma == 1)
-      f2 = sum(data_gamma == 2)
-      f0_hat = ifelse(f2 == 0, (n - 1)/n * f1 * (f1 - 1)/2, (n - 1)/n * f1^2/2/f2) %>% ceiling()
-      
-      output = apply(data, 2, function(x){
-        
-        p_i_hat = iNEXT.3D:::EstiBootComm.Ind(Spec = x)
-        
-        if(length(p_i_hat) != length(x)){
-          
-          p_i_hat_unobs = p_i_hat[(length(x)+1):length(p_i_hat)]
-          p_i_hat_obs = p_i_hat[1:length(x)]
-          p_i_hat = c(p_i_hat_obs, rep(0, f0_hat))
-          candidate = which(p_i_hat==0)
-          
-          chosen = sample(x = candidate, size = min(length(p_i_hat_unobs), length(candidate)), replace = F)
-          p_i_hat[chosen] = (1-sum(p_i_hat))/length(chosen)
-          
-          p_i_hat
-          
-        } else {
-          
-          p_i_hat = c(p_i_hat, rep(0, f0_hat))
-          p_i_hat
-          
-        }
-      })
-      
-    }
-    
-    if (datatype == 'incidence'){
-      
-      S_obs = sum(data_gamma > 0)
-      t = data_gamma[1]
-      Q1 = sum(data_gamma == 1)
-      Q2 = sum(data_gamma == 2)
-      Q0_hat = if ( Q2 == 0 ){( (t-1)/t ) * ( Q1*(Q1-1)/2 )} else {( (t-1)/t ) * ( (Q1^2) / (2*Q2) )} %>% ceiling
-      
-      output = apply(data, 2, function(x){
-        
-        pi_i_hat = iNEXT.3D:::EstiBootComm.Sam(Spec = x)
-        
-        if(length(pi_i_hat) != (length(x) - 1)){
-          
-          pi_i_hat_unobs = pi_i_hat[length(x):length(pi_i_hat)]
-          pi_i_hat_obs = pi_i_hat[1:(length(x)-1)]
-          pi_i_hat = c(pi_i_hat_obs, rep(0, Q0_hat))
-          candidate = which(pi_i_hat == 0)
-          chosen = sample(x = candidate, size = min(length(pi_i_hat_unobs), length(candidate)), replace = F)
-          pi_i_hat[chosen] = pi_i_hat_unobs
-          
-          pi_i_hat
-          
-        } else {
-          
-          pi_i_hat = c(pi_i_hat, rep(0, Q0_hat))
-          pi_i_hat
-          
-        }
-      })
-      
-    }
-    
-    return(output)
-    
-  }
-  
-  
-  for_each_region = function(data, region_name, N) {
-    
-    if (datatype == 'abundance') {
-      
-      n = sum(data)
-      data_gamma = rowSums(data)
-      data_gamma = data_gamma[data_gamma>0]
-      data_alpha = as.matrix(data) %>% as.vector
-      
-      gamma = AO3D(as.numeric(data_gamma), 'TD', q = q, datatype = "abundance", nboot = 0, method = 'Observed')
-      
-      alpha = AO3D(as.numeric(data_alpha), 'TD', q = q, datatype = "abundance", nboot = 0, method = 'Observed')
-    }
-    
-    if (datatype == 'incidence_raw') {
-      
-      sampling_units = sapply(data, ncol)
-      n = unique(sampling_units)
-      
-      gamma = Reduce('+', data)
-      gamma[gamma>1] = 1
-      data_gamma_raw = gamma
-      data_gamma_freq = c(n, rowSums(gamma))
-      
-      data_alpha_freq = sapply(data, rowSums) %>% c(n, .)
-      
-      data_2D = apply(sapply(data, rowSums), 2, function(x) c(n, x)) %>% as.data.frame
-      
-      gamma = AO3D(as.numeric(data_gamma_freq), diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
-      
-      alpha = AO3D(as.numeric(data_alpha_freq), diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
-    }
-    
-    
-    gamma = gamma[,c(3,2)]
-    
-    alpha = alpha[,c(3,2)]
-    
-    colnames(gamma) = colnames(alpha) = c('Diversity', 'Order.q')
-    
-    alpha$Diversity = alpha$Diversity / N
-    
-    beta = alpha
-    beta$Diversity = gamma$Diversity / alpha$Diversity
-    
-    if(nboot>1){
-      
-      se = future_lapply(1:nboot, function(i){
-        
-        if (datatype == 'abundance') {
-          
-          bootstrap_population = bootstrap(data, data_gamma, 'abundance')
-          bootstrap_sample = sapply(1:ncol(data), function(k) rmultinom(n = 1, size = sum(data[,k]), prob = bootstrap_population[,k]))
-          
-          bootstrap_data_gamma = rowSums(bootstrap_sample)
-          bootstrap_data_gamma = bootstrap_data_gamma[bootstrap_data_gamma > 0]
-          bootstrap_data_alpha = as.matrix(bootstrap_sample) %>% as.vector
-          bootstrap_data_alpha = bootstrap_data_alpha[bootstrap_data_alpha > 0]
-          
-          gamma = AO3D(as.numeric(bootstrap_data_gamma), diversity = 'TD', q = q, datatype = "abundance", nboot = 0, method = 'Observed')
-          
-          alpha = AO3D(as.numeric(bootstrap_data_alpha), diversity = 'TD', q = q, datatype = "abundance", nboot = 0, method = 'Observed')
-          
-        }
-        
-        if (datatype == 'incidence_raw') {
-          
-          bootstrap_population = bootstrap(data_2D, data_gamma_freq, 'incidence')
-          
-          raw = lapply(1:ncol(bootstrap_population), function(j){
-            
-            lapply(1:nrow(bootstrap_population), function(i) rbinom(n = n, size = 1, prob = bootstrap_population[i,j])) %>% do.call(rbind,.)
-            
-          })
-          
-          gamma = Reduce('+', raw)
-          gamma[gamma > 1] = 1
-          bootstrap_data_gamma_freq = c(n, rowSums(gamma))
-          
-          bootstrap_data_alpha_freq = sapply(raw, rowSums) %>% c(n, .)
-          
-          bootstrap_data_gamma_freq = bootstrap_data_gamma_freq[bootstrap_data_gamma_freq > 0]
-          bootstrap_data_alpha_freq = bootstrap_data_alpha_freq[bootstrap_data_alpha_freq > 0]
-          
-          gamma = AO3D(bootstrap_data_gamma_freq, diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
-          
-          alpha = AO3D(bootstrap_data_alpha_freq, diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
-          
-        }
-        
-        gamma = gamma$qTD
-        alpha = alpha$qTD
-        alpha = alpha / N
-        beta = gamma/alpha
-        
-        cbind(gamma, alpha, beta) %>% as.matrix
-        
-      }) %>% abind(along = 3) %>% apply(1:2, sd)
-      
-    } else {
-      
-      se = matrix(0, ncol = 3, nrow = nrow(beta))
-      colnames(se) = c("gamma", "alpha", "beta")
-      se = as.data.frame(se)
-      
-    }
-    
-    se = as.data.frame(se)
-    
-    gamma = gamma %>% mutate(Dataset = region_name,
-                             s.e. = se$gamma,
-                             LCL = Diversity - tmp * se$gamma,
-                             UCL = Diversity + tmp * se$gamma)
-    
-    alpha = alpha %>% mutate(Dataset = region_name,
-                             s.e. = se$alpha,
-                             LCL = Diversity - tmp * se$alpha,
-                             UCL = Diversity + tmp * se$alpha)
-    
-    beta = beta %>% mutate(  Dataset = region_name,
-                             s.e. = se$beta,
-                             LCL = Diversity - tmp * se$beta,
-                             UCL = Diversity + tmp * se$beta)
-    
-    rbind(gamma, alpha, beta) %>% cbind(., Type = rep(c('gamma', 'alpha', 'beta'), each = length(q)))
-    
-  }
-  
-  output = lapply(1:length(data), function(i) for_each_region(data = data[[i]], region_name = region_names[i], N = Ns[i]))
-  names(output) = region_names
-  
-  return(output)
-  
-}
 
 
 #' @Function SGF.data.transf is used to transform six forests data into proposed data format for function 'iNEXTbeta3D'.
@@ -590,15 +359,178 @@ for_fig_5 = function(data, nboot) {
   
   output.div = iNEXTbeta3D(data, level = coverage, datatype = "incidence_raw", nboot = nboot)
   
-  output.obs = obsbeta(data, q = c(0,1,2), datatype = "incidence_raw", nboot = nboot)
+  obsbeta.inci = function(data, q = seq(0, 2, 0.25), nboot = 20, conf = 0.95) {
+    
+    if (is.null(names(data))) dataset_names = paste0("Dataset_", 1:length(data)) else dataset_names = names(data)
+    Ns = sapply(data, length)
+    data_list = data
+    
+    tmp = qnorm(1 - (1 - conf)/2)
+    
+    for_each_dataset = function(data, dataset_name, N) {
+      
+      sampling_units = sapply(data, ncol)
+      n = unique(sampling_units)
+      
+      gamma = Reduce('+', data)
+      gamma[gamma>1] = 1
+      data_gamma_raw = gamma
+      data_gamma_freq = c(n, rowSums(gamma))
+      
+      data_alpha_freq = sapply(data, rowSums) %>% c(n, .)
+      
+      data_2D = apply(sapply(data, rowSums), 2, function(x) c(n, x)) %>% as.data.frame
+      
+      
+      
+      gamma = ObsAsy3D(as.numeric(data_gamma_freq), diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
+      
+      alpha = ObsAsy3D(as.numeric(data_alpha_freq), diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
+      
+      gamma = gamma[,c(3,2)] %>% set_colnames(c('Value', 'Order.q'))
+      
+      alpha = alpha[,c(3,2)] %>% set_colnames(c('Value', 'Order.q'))
+      
+      alpha$Value = alpha$Value / N
+      
+      beta = alpha
+      beta$Value = gamma$Value/alpha$Value
+      C = beta %>% mutate(Value = ifelse(Order.q==1, log(Value)/log(N), (Value^(1-Order.q) - 1)/(N^(1-Order.q)-1)))
+      U = beta %>% mutate(Value = ifelse(Order.q==1, log(Value)/log(N), (Value^(Order.q-1) - 1)/(N^(Order.q-1)-1)))
+      V = beta %>% mutate(Value = (Value-1)/(N-1))
+      S = beta %>% mutate(Value = (1/Value-1)/(1/N-1))
+      
+      if(nboot>1){
+        
+        se = future_lapply(1:nboot, function(i){
+          
+          
+          
+          bootstrap_population = bootstrap(data_2D, data_gamma_freq)
+          
+          raw = lapply(1:ncol(bootstrap_population), function(j){
+            
+            lapply(1:nrow(bootstrap_population), function(i) rbinom(n = n, size = 1, prob = bootstrap_population[i,j])) %>% do.call(rbind,.)
+            
+          })
+          
+          gamma = Reduce('+', raw)
+          gamma[gamma > 1] = 1
+          bootstrap_data_gamma_freq = c(n, rowSums(gamma))
+          
+          bootstrap_data_alpha_freq = sapply(raw, rowSums) %>% c(n, .)
+          
+          bootstrap_data_gamma_freq = bootstrap_data_gamma_freq[bootstrap_data_gamma_freq > 0]
+          bootstrap_data_alpha_freq = bootstrap_data_alpha_freq[bootstrap_data_alpha_freq > 0]
+          
+          gamma = ObsAsy3D(bootstrap_data_gamma_freq, diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
+          
+          alpha = ObsAsy3D(bootstrap_data_alpha_freq, diversity = 'TD', q = q, datatype = "incidence_freq", nboot = 0, method = 'Observed')
+          
+          gamma = gamma$qTD
+          
+          alpha = alpha$qTD
+          alpha = alpha / N
+          
+          beta = data.frame(Value = gamma/alpha, q)
+          
+          C = (beta %>% mutate(Value = ifelse(q == 1,log(Value)/log(N),(Value^(1 - q) - 1)/(N^(1 - q) - 1))))$Value
+          U = (beta %>% mutate(Value = ifelse(q == 1,log(Value)/log(N),(Value^(q - 1) - 1)/(N^(q - 1) - 1))))$Value
+          V = (beta %>% mutate(Value = (Value - 1)/(N - 1)))$Value
+          S = (beta %>% mutate(Value = (1/Value - 1)/(1/N - 1)))$Value
+          
+          beta = beta$Value
+          
+          cbind(gamma, alpha, beta, C, U, V, S) %>% as.matrix
+          
+        }) %>% abind(along = 3) %>% apply(1:2, sd)
+        
+      } else {
+        
+        se = matrix(0, ncol = 7, nrow = nrow(beta))
+        colnames(se) = c("gamma", "alpha", "beta", "C", "U", 'V', 'S')
+        se = as.data.frame(se)
+        
+      }
+      
+      
+      
+      se = as.data.frame(se)
+      
+      gamma = gamma %>% mutate(Size = n,
+                               s.e. = se$gamma,
+                               LCL = Value - tmp * se$gamma,
+                               UCL = Value + tmp * se$gamma,
+                               Dataset = dataset_name) %>% select(c("Dataset", "Order.q", "Size", "Value", "s.e.", "LCL", "UCL"))
+      
+      alpha = alpha %>% mutate(Size = n,
+                               s.e. = se$alpha,
+                               LCL = Value - tmp * se$alpha,
+                               UCL = Value + tmp * se$alpha,
+                               Dataset = dataset_name) %>% select(c("Dataset", "Order.q", "Size", "Value", "s.e.", "LCL", "UCL"))
+      
+      beta = beta %>% mutate(  Size = n,
+                               s.e. = se$beta,
+                               LCL = Value - tmp * se$beta,
+                               UCL = Value + tmp * se$beta,
+                               Dataset = dataset_name) %>% select(c("Dataset", "Order.q", "Size", "Value", "s.e.", "LCL", "UCL"))
+      
+      rbind(gamma, alpha, beta) %>% cbind(., Type = rep(c('gamma', 'alpha', 'beta'), each = length(q)))
+      
+    }
+    
+    bootstrap = function(data, data_gamma){
+      
+      S_obs = sum(data_gamma > 0)
+      t = data_gamma[1]
+      Q1 = sum(data_gamma == 1)
+      Q2 = sum(data_gamma == 2)
+      Q0_hat = if ( Q2 == 0 ){( (t-1)/t ) * ( Q1*(Q1-1)/2 )} else {( (t-1)/t ) * ( (Q1^2) / (2*Q2) )} %>% ceiling
+      
+      output = apply(data, 2, function(x){
+        
+        pi_i_hat = iNEXT.3D:::EstiBootComm.Sam(Spec = x)
+        
+        if(length(pi_i_hat) != (length(x) - 1)){
+          
+          pi_i_hat_unobs = pi_i_hat[length(x):length(pi_i_hat)]
+          pi_i_hat_obs = pi_i_hat[1:(length(x)-1)]
+          pi_i_hat = c(pi_i_hat_obs, rep(0, Q0_hat))
+          candidate = which(pi_i_hat == 0)
+          
+          chosen = sample(x = candidate, size = min(length(pi_i_hat_unobs), length(candidate)), replace = F)
+          pi_i_hat[chosen] = unique(pi_i_hat_unobs)
+          
+          pi_i_hat
+          
+        } else {
+          
+          pi_i_hat = c(pi_i_hat, rep(0, Q0_hat))
+          pi_i_hat
+          
+        }
+      })
+      
+      return(output)
+    }
+    
+    output = lapply(1:length(data_list), function(i) for_each_dataset(data = data_list[[i]], dataset_name = dataset_names[i], N = Ns[i]))
+    
+    names(output) = dataset_names
+    
+    return(output)
+    
+  }
+  
+  output.obs = obsbeta.inci(data, q = c(0,1,2), nboot = nboot)
   
   output.beta = rbind(
     
     lapply(output.div, function(x) x$beta %>% select(c("Dataset", "Order.q", "SC", "Beta", "s.e.", "LCL", "UCL"))) %>% 
-      do.call(rbind,.) %>% rename("Diversity" = "Beta"),
+      do.call(rbind,.),
     
     output.obs %>% do.call(rbind,.) %>% filter(Type == "beta") %>% mutate(SC = "NA") %>% 
-      select(c("Dataset", "Order.q", "SC", "Diversity", "s.e.", "LCL", "UCL"))
+      select(c("Dataset", "Order.q", "SC", "Value", "s.e.", "LCL", "UCL")) %>% rename("Beta" = "Value")
     )
   
   output.beta$Order.q = as.factor(output.beta$Order.q); levels(output.beta$Order.q) = c("q = 0", "q = 1", "q = 2")
@@ -622,9 +554,9 @@ fig_5 = function(output) {
   output[output$SC == "NA", 'SC'] = 'Observed'
   output$SC = factor(output$SC, levels = c("Observed", "0.8", "0.9", "0.95", "1"))
   
-  ggplot(output, aes(x = Age, y = Diversity)) + geom_line(aes(x = Dataset + Age - 1997, y = Diversity, colour = Site), size = 0.7) +
+  ggplot(output, aes(x = Age, y = Beta)) + geom_line(aes(x = Dataset + Age - 1997, y = Beta, colour = Site), size = 0.7) +
     geom_ribbon(aes(x = Dataset + Age - 1997, ymin = LCL, ymax = UCL, fill = Site), alpha = 0.2, linetype = 0) +
-    geom_point(aes(x = Dataset + Age - 1997, y = Diversity, colour = Site, shape = Site), size = 1.5) +
+    geom_point(aes(x = Dataset + Age - 1997, y = Beta, colour = Site, shape = Site), size = 1.5) +
     facet_grid(SC ~ Order.q, labeller = labeller(SC = c(`Observed` = "Observed data", `0.8` = "Coverage = 80%", `0.9` = "Coverage = 90%", 
                                                             `0.95` = "Coverage = 95%", `1` = "Asymptotic"))) +
     labs(x = "Forest age (years)", y = 'Beta diversity') +
