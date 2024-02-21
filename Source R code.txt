@@ -340,7 +340,8 @@ SGF.data.transf = function(data) {
       tmp[is.na(tmp)] = 0
       tmp = t(tmp[,-1])
       tmp[tmp > 1] = 1
-      list(tmp[1:(nrow(tmp)/2),], tmp[(nrow(tmp)/2+1):nrow(tmp),])
+      list(tmp[1:(nrow(tmp)/2),] %>% set_rownames(colnames(tmp1)[-1]), 
+           tmp[(nrow(tmp)/2+1):nrow(tmp),] %>% set_rownames(colnames(tmp2)[-1]))
     }
   })
   
